@@ -1,0 +1,13 @@
+server:
+  port: 8000
+
+spring:
+  mvc:
+    async:
+      request-timeout: 60000
+  ai:
+    mcp:
+      server:
+        type: ASYNC
+        name: metersphere-mcp-server
+        version: v3.x
