@@ -2,12 +2,16 @@ package io.metersphere.mcp.server.client;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpRequest;
-import org.springframework.beans.factory.annotation.Value;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 
+import java.io.IOException;
 import java.net.URI;
 
 /**
@@ -26,43 +30,98 @@ public class MsHttpClient {
         MsHttpClient.serverConfig = serverConfig;
     }
 
-    /**
-     * 测试与 MeterSphere 服务器的连接
-     *
-     * @return 连接成功返回 true，否则返回 false
-     * @throws MsConnectionException 连接异常时抛出
-     */
-    public static boolean validate() {
-
+    public static String get(String url) {
         // 验证必要参数
+        if (serverConfig == null) {
+            return "服务器配置不存在";
+        }
+
         if (StringUtils.isAnyBlank(serverConfig.getMeterSphereAddress(),
                 serverConfig.getAccessKey(),
                 serverConfig.getSecretKey())) {
-            return false;
+            return "服务地址、AccessKey 或 SecretKey 不能为空";
         }
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            String userInfoUrl = buildUrl(serverConfig.getMeterSphereAddress(), URLConstants.USER_INFO);
-            HttpGet httpGet = new HttpGet(userInfoUrl);
+            HttpGet httpGet = new HttpGet(url);
             addRequestHeaders(httpGet, serverConfig);
 
-            // 使用非过时的 API 执行请求
-            return httpClient.execute(httpGet, response -> response.getCode() == 200);
+            return httpClient.execute(httpGet, response -> {
+                int statusCode = response.getCode();
+                if (statusCode == HttpStatus.SC_OK) {
+                    if (response.getEntity() == null) {
+                        return "未查到任何数据";
+                    }
+                    String content = EntityUtils.toString(
+                            response.getEntity(), "UTF-8");
+                    return StringUtils.isNotBlank(content) ? content : "未查到任何数据";
+                } else {
+                    return "连接失败，HTTP 状态码：" + statusCode;
+                }
+            });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-        } catch (Exception e) {
-            throw new MsConnectionException("连接 MeterSphere 服务器失败", e);
+    /**
+     * 发送 POST 请求到指定 URL
+     *
+     * @param url         请求的 URL
+     * @param requestBody JSON 格式的请求体字符串
+     * @return 响应内容或错误信息
+     */
+    public static String post(String url, String requestBody) {
+        // 验证必要参数
+        if (serverConfig == null) {
+            return "服务器配置不存在";
+        }
+
+        if (StringUtils.isAnyBlank(serverConfig.getMeterSphereAddress(),
+                serverConfig.getAccessKey(),
+                serverConfig.getSecretKey())) {
+            return "服务地址、AccessKey 或 SecretKey 不能为空";
+        }
+
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpPost httpPost = new HttpPost(url);
+            addRequestHeaders(httpPost, serverConfig);
+
+            // 添加请求体
+            if (StringUtils.isNotBlank(requestBody)) {
+                StringEntity entity = new StringEntity(requestBody, ContentType.APPLICATION_JSON);
+                httpPost.setEntity(entity);
+            }
+
+            return httpClient.execute(httpPost, response -> {
+                int statusCode = response.getCode();
+                if (statusCode == HttpStatus.SC_OK) {
+                    if (response.getEntity() == null) {
+                        return "未查到任何数据";
+                    }
+                    String content = EntityUtils.toString(
+                            response.getEntity(), "UTF-8");
+                    return StringUtils.isNotBlank(content) ? content : "未查到任何数据";
+                } else {
+                    return "连接失败，HTTP 状态码：" + statusCode;
+                }
+            });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
     /**
      * 构建完整的 URL
      *
-     * @param baseUrl  基础 URL
      * @param endpoint API 端点路径
      * @return 完整的 URL 字符串
      */
-    private static String buildUrl(String baseUrl, String endpoint) {
-        return URI.create(baseUrl)
+    public static String buildUrl(String endpoint) {
+        if (serverConfig == null || StringUtils.isBlank(serverConfig.getMeterSphereAddress())) {
+            throw new IllegalArgumentException("服务器配置或服务地址不能为空");
+        }
+        return URI.create(serverConfig.getMeterSphereAddress())
                 .resolve(endpoint.startsWith("/") ? endpoint.substring(1) : endpoint)
                 .toString();
     }

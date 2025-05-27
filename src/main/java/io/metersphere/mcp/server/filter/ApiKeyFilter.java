@@ -41,12 +41,10 @@ public class ApiKeyFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-
-        LogUtils.info("获取服务地址：" + METER_SPHERE_URL);
-
         if (!(request instanceof HttpServletRequest httpRequest)) {
             throw new ServletException("非HTTP请求类型");
         }
+        LogUtils.info("当前URL：" + httpRequest.getRequestURI());
 
         // 只对SSE端点进行验证
         if (SSE_ENDPOINT.equals(httpRequest.getRequestURI())) {

@@ -1,0 +1,31 @@
+# local env files
+.env.local
+.env.*.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-error.log*
+
+# Editor directories and files
+.idea/*
+!.idea/icon.png
+**/*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.mvn
+!.mvn/maven-wrapper.properties
+.history
+
+target
+.settings
+.project
+.classpath
+.jython_cache
+qywx.json
+### flattened
+.flattened-pom.xml
