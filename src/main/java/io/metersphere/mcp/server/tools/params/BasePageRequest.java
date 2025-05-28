@@ -11,4 +11,6 @@ public class BasePageRequest extends BaseCondition {
     private int pageSize = 10;
 
     private Map<String, String> sort;
+
+    private String projectId;
 }

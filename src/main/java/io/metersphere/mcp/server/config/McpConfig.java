@@ -2,6 +2,7 @@ package io.metersphere.mcp.server.config;
 
 import io.metersphere.mcp.server.tools.ApiDebugMcpServer;
 import io.metersphere.mcp.server.tools.ApiDocMcpServer;
+import io.metersphere.mcp.server.tools.UserMcpServer;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
@@ -33,4 +34,8 @@ public class McpConfig {
         return MethodToolCallbackProvider.builder().toolObjects(apiDebugMcpServer).build();
     }
 
+    @Bean
+    public ToolCallbackProvider userTools(UserMcpServer userMcpServer) {
+        return MethodToolCallbackProvider.builder().toolObjects(userMcpServer).build();
+    }
 }

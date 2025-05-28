@@ -16,12 +16,14 @@ public class ApiDocMcpServer {
      * @return API列表
      */
     @Tool(description = "API 列表获取工具，获取 API 列表信息")
-    public String getApiList() {
+    public String getApiList(String projectId) {
         // 这里可以添加获取API列表的逻辑
         String url = MsHttpClient.buildUrl(URLConstants.API_LIST);
         BasePageRequest request = new BasePageRequest();
         request.setCurrent(1);
         request.setPageSize(10);
+        request.setProjectId(projectId);
+
         return MsHttpClient.post(url, JSON.toJSONString(request));
     }
 

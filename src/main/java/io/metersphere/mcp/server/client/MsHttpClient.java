@@ -1,161 +1,159 @@
 package io.metersphere.mcp.server.client;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.HttpStatus;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * MeterSphere HTTP 客户端工具类
  */
 public class MsHttpClient {
+    private static final Logger log = LoggerFactory.getLogger(MsHttpClient.class);
+    private static final AtomicReference<ServerConfig> serverConfig = new AtomicReference<>();
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
-    private static ServerConfig serverConfig;
+    private static final String CONTENT_TYPE_JSON = "application/json";
+
+    private MsHttpClient() {
+        // 私有构造函数防止实例化
+    }
 
     /**
-     * 构造函数
+     * 设置服务器配置
      *
-     * @param serverConfig 包含连接参数的配置对象
+     * @param config 包含连接参数的配置对象
      */
-    public static void add(ServerConfig serverConfig) {
-        MsHttpClient.serverConfig = serverConfig;
+    public static void add(ServerConfig config) {
+        serverConfig.set(config);
     }
 
+    /**
+     * 发送GET请求到指定URL
+     *
+     * @param url 请求的URL
+     * @return 响应内容或错误信息
+     */
     public static String get(String url) {
-        // 验证必要参数
-        if (serverConfig == null) {
-            return "服务器配置不存在";
-        }
+        try {
+            validateConfig();
 
-        if (StringUtils.isAnyBlank(serverConfig.getMeterSphereAddress(),
-                serverConfig.getAccessKey(),
-                serverConfig.getSecretKey())) {
-            return "服务地址、AccessKey 或 SecretKey 不能为空";
-        }
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .header("Accept", CONTENT_TYPE_JSON)
+                    .header("Content-Type", CONTENT_TYPE_JSON)
+                    .headers(getAuthHeaders())
+                    .build();
 
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            HttpGet httpGet = new HttpGet(url);
-            addRequestHeaders(httpGet, serverConfig);
-
-            return httpClient.execute(httpGet, response -> {
-                int statusCode = response.getCode();
-                if (statusCode == HttpStatus.SC_OK) {
-                    if (response.getEntity() == null) {
-                        return "未查到任何数据";
-                    }
-                    String content = EntityUtils.toString(
-                            response.getEntity(), "UTF-8");
-                    return StringUtils.isNotBlank(content) ? content : "未查到任何数据";
-                } else {
-                    return "连接失败，HTTP 状态码：" + statusCode;
-                }
-            });
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            return sendRequest(request);
+        } catch (Exception e) {
+            log.error("GET请求失败: {}", url, e);
+            return "请求失败: " + e.getMessage();
         }
     }
 
     /**
-     * 发送 POST 请求到指定 URL
+     * 发送POST请求到指定URL
      *
-     * @param url         请求的 URL
-     * @param requestBody JSON 格式的请求体字符串
+     * @param url         请求的URL
+     * @param requestBody JSON格式的请求体字符串
      * @return 响应内容或错误信息
      */
     public static String post(String url, String requestBody) {
-        // 验证必要参数
-        if (serverConfig == null) {
-            return "服务器配置不存在";
-        }
+        try {
+            validateConfig();
 
-        if (StringUtils.isAnyBlank(serverConfig.getMeterSphereAddress(),
-                serverConfig.getAccessKey(),
-                serverConfig.getSecretKey())) {
-            return "服务地址、AccessKey 或 SecretKey 不能为空";
-        }
+            var builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Accept", CONTENT_TYPE_JSON)
+                    .header("Content-Type", CONTENT_TYPE_JSON)
+                    .headers(getAuthHeaders());
 
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            HttpPost httpPost = new HttpPost(url);
-            addRequestHeaders(httpPost, serverConfig);
-
-            // 添加请求体
             if (StringUtils.isNotBlank(requestBody)) {
-                StringEntity entity = new StringEntity(requestBody, ContentType.APPLICATION_JSON);
-                httpPost.setEntity(entity);
+                builder.POST(HttpRequest.BodyPublishers.ofString(requestBody));
+            } else {
+                builder.POST(HttpRequest.BodyPublishers.noBody());
             }
 
-            return httpClient.execute(httpPost, response -> {
-                int statusCode = response.getCode();
-                if (statusCode == HttpStatus.SC_OK) {
-                    if (response.getEntity() == null) {
-                        return "未查到任何数据";
-                    }
-                    String content = EntityUtils.toString(
-                            response.getEntity(), "UTF-8");
-                    return StringUtils.isNotBlank(content) ? content : "未查到任何数据";
-                } else {
-                    return "连接失败，HTTP 状态码：" + statusCode;
-                }
-            });
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            return sendRequest(builder.build());
+        } catch (Exception e) {
+            log.error("POST请求失败: {}", url, e);
+            return "请求失败: " + e.getMessage();
         }
     }
 
     /**
-     * 构建完整的 URL
+     * 构建完整的URL
      *
-     * @param endpoint API 端点路径
-     * @return 完整的 URL 字符串
+     * @param endpoint API端点路径
+     * @return 完整的URL字符串
      */
     public static String buildUrl(String endpoint) {
-        if (serverConfig == null || StringUtils.isBlank(serverConfig.getMeterSphereAddress())) {
-            throw new IllegalArgumentException("服务器配置或服务地址不能为空");
+        var config = Optional.ofNullable(serverConfig.get())
+                .orElseThrow(() -> new IllegalArgumentException("服务器配置不能为空"));
+
+        if (StringUtils.isBlank(config.getMeterSphereAddress())) {
+            throw new IllegalArgumentException("服务地址不能为空");
         }
-        return URI.create(serverConfig.getMeterSphereAddress())
+
+        return URI.create(config.getMeterSphereAddress())
                 .resolve(endpoint.startsWith("/") ? endpoint.substring(1) : endpoint)
                 .toString();
     }
 
-    /**
-     * 添加请求头信息
-     *
-     * @param request      HTTP 请求对象
-     * @param serverConfig 包含认证信息的设置状态对象
-     * @throws MsAuthException 认证信息处理异常时抛出
-     */
-    private static void addRequestHeaders(HttpRequest request, ServerConfig serverConfig) {
-        request.addHeader("Accept", ContentType.APPLICATION_JSON.getMimeType());
-        request.addHeader("Content-Type", ContentType.APPLICATION_JSON.toString());
-        request.addHeader(CodingUtils.ACCESS_KEY, serverConfig.getAccessKey());
+    private static String sendRequest(HttpRequest request) throws IOException, InterruptedException {
+        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
+        int statusCode = response.statusCode();
+        String body = response.body();
+
+        if (statusCode == HttpStatus.SC_OK) {
+            return StringUtils.isNotBlank(body) ? body : "未查到任何数据";
+        } else if (statusCode >= HttpStatus.SC_BAD_REQUEST && statusCode < HttpStatus.SC_SERVER_ERROR) {
+            return "参数错误，HTTP状态码：" + statusCode + "，错误信息：" + body;
+        } else {
+            return "连接失败，HTTP状态码：" + statusCode;
+        }
+    }
+
+    private static void validateConfig() {
+        var config = Optional.ofNullable(serverConfig.get())
+                .orElseThrow(() -> new IllegalArgumentException("服务器配置不存在"));
+
+        if (StringUtils.isAnyBlank(
+                config.getMeterSphereAddress(),
+                config.getAccessKey(),
+                config.getSecretKey())) {
+            throw new IllegalArgumentException("服务地址、AccessKey或SecretKey不能为空");
+        }
+    }
+
+    private static String[] getAuthHeaders() {
+        var config = serverConfig.get();
         try {
-            request.addHeader(CodingUtils.SIGNATURE, CodingUtils.getSignature(serverConfig));
+            return new String[]{
+                    CodingUtils.ACCESS_KEY, config.getAccessKey(),
+                    CodingUtils.SIGNATURE, CodingUtils.getSignature(config)
+            };
         } catch (Exception e) {
             throw new MsAuthException("生成签名失败", e);
         }
     }
 
     /**
-     * MeterSphere 连接异常
-     */
-    public static class MsConnectionException extends RuntimeException {
-        public MsConnectionException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
-
-    /**
-     * MeterSphere 认证异常
+     * MeterSphere认证异常
      */
     public static class MsAuthException extends RuntimeException {
         public MsAuthException(String message, Throwable cause) {
