@@ -15,24 +15,9 @@ MeterSphere MCP Server（Model Context Protocol Server）通过 HTTP + SSE、STD
    mvn clean install
    ```
 
-## 核心接口测试工具（API Testing Tools）
+## 核心功能
 
-### api-doc-synchronizer：接口文档同步工具
 
-### api-test-executor：执行API接口测试用例
-
-### code-test-generator：基于代码生成测试案例
-
-### code-test-synchronizer：代码用例与测试平台同步
-
-### test-result-analyzer：测试结果智能分析
-
-## 测试资源管理工具（Test Resource Management Tools）
-
-### test-case-fetcher：获取测试平台测试用例
-
-### issue-test-linker：缺陷与测试用例关联
-  
 ## 客户端配置示例
 
 ### VS Code
