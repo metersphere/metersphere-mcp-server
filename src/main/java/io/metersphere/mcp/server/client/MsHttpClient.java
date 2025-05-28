@@ -1,9 +1,8 @@
 package io.metersphere.mcp.server.client;
 
+import io.metersphere.mcp.server.log.LogUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.HttpStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -18,7 +17,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * MeterSphere HTTP 客户端工具类
  */
 public class MsHttpClient {
-    private static final Logger log = LoggerFactory.getLogger(MsHttpClient.class);
     private static final AtomicReference<ServerConfig> serverConfig = new AtomicReference<>();
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -59,7 +57,7 @@ public class MsHttpClient {
 
             return sendRequest(request);
         } catch (Exception e) {
-            log.error("GET请求失败: {}", url, e);
+            LogUtils.error("GET请求失败: ", e);
             return "请求失败: " + e.getMessage();
         }
     }
@@ -89,7 +87,7 @@ public class MsHttpClient {
 
             return sendRequest(builder.build());
         } catch (Exception e) {
-            log.error("POST请求失败: {}", url, e);
+            LogUtils.error("POST请求失败: ", e);
             return "请求失败: " + e.getMessage();
         }
     }

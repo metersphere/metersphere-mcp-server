@@ -12,8 +12,6 @@ public class UserMcpServer {
 
     /**
      * 获取用户基本信息
-     *
-     * @return API列表
      */
     @Tool(description = "用户基本信息获取工具，获取用户相关信息，包括权限和角色，所属组织和项目等")
     public String getUser() {
